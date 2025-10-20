@@ -44,9 +44,14 @@
         return null;
     }
 
+    /** MODIFIED: Now removes parentheses in addition to other characters **/
     function normalizeForSearch(str) {
         if (!str) return '';
-        return str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[–-]/g, '');
+        return str
+            .toLowerCase()
+            .normalize('NFD') // Decompose diacritics (e.g., 'ē' -> 'e' + '̄')
+            .replace(/[\u0300-\u036f]/g, '') // Remove the diacritic marks
+            .replace(/[()–-]/g, ''); // Remove parentheses, en-dashes, and hyphens
     }
 
     function parseCSV(data) {
@@ -284,8 +289,16 @@
                 const highlightedHtml = words.map(wordPart => {
                     if (!hasBolded && normalizeForSearch(wordPart).startsWith(normalizedSearchTerm)) {
                         hasBolded = true;
+                        // Find the original substring to bold, case-insensitively
+                        const originalWordPart = wordPart;
+                        const normalizedWordPart = normalizeForSearch(originalWordPart);
+                        const matchIndex = normalizedWordPart.indexOf(normalizedSearchTerm);
                         const len = rawSearchTerm.length;
-                        return `<strong>${wordPart.substring(0, len)}</strong>${wordPart.substring(len)}`;
+                        
+                        // Reconstruct the bolding based on original casing
+                        return originalWordPart.substring(0, matchIndex) + 
+                               `<strong>${originalWordPart.substring(matchIndex, matchIndex + len)}</strong>` +
+                               originalWordPart.substring(matchIndex + len);
                     }
                     return wordPart;
                 }).join(' ');
@@ -323,7 +336,6 @@
     }
 
     async function initialize() {
-        // MODIFIED: Attach crucial listeners before any async operations
         acknowledgeCookieBtn.addEventListener('click', () => {
             cookieNoticeModal.style.display = 'none';
             setCookie('cookieConsent', 'true', 365);
@@ -346,10 +358,9 @@
         } catch (error) {
             console.error("Error fetching or parsing vocabulary.csv:", error);
             resultDisplay.innerHTML = `<div class="placeholder-text"><p style="color:var(--danger-color);">Error: Could not load vocabulary.csv. This app must be run from a web server.</p></div>`;
-            return; // Stop initialization if data fails to load
+            return;
         }
 
-        // The rest of the initialization can proceed now
         vocabulary.sort((a, b) => a.latin.localeCompare(b.latin));
         populateWordWheel();
         updateWordWheelStyles();
