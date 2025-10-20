@@ -139,7 +139,7 @@
             .result-header h2 { font-size: 1.1em; font-weight: bold; }
             
             #view-study-list-btn {
-                order: -1; /* This moves it to the top of the flex container */
+                order: -1;
                 background-color: var(--accent-color);
                 color: var(--accent-text-color);
                 border-radius: 8px;
@@ -217,7 +217,6 @@
 
     <script>
         (function() {
-            // --- NEW DATA ---
             const fullCsvData = `"alter altera alterum","other of two","1"
 "Cornēlia –ae f.","Cornelia","1"
 "cūr","why","1"
@@ -976,7 +975,7 @@
 "audeō audēre ausus sum","to dare","40"
 "crūdēlis crūdēle","unfeeling, cruel","40"
 "cum prīmum","as soon as","40"
-"cupiō cupere cupiī/cupīvī cupītus","to desire","40"
+"cupiō cupere cupīī/cupīvī cupītus","to desire","40"
 "dēsiliō –īre –uī –sultus","to leap or spring down; alight from","40"
 "discō discere didicī","to learn","40"
 "īgnōrō īgnōrāre īgnōrāvī īgnōrātus","to not know; ignore","40"
@@ -1246,10 +1245,8 @@
 
             function parseCSV(data) {
                 const lines = data.trim().split('\n');
-                // Handle optional header
                 const hasHeader = lines[0].toLowerCase().includes('latin');
                 const dataLines = hasHeader ? lines.slice(1) : lines;
-
                 const records = [];
                 for (const line of dataLines) {
                      if (!line) continue;
@@ -1449,17 +1446,47 @@
                 e.target.value = '';
             }
 
+            /** MODIFIED: New multi-word search with prioritization and bolding **/
             function onSearchInput(e) {
-                const normalizedSearchTerm = normalizeForSearch(e.target.value);
+                const rawSearchTerm = e.target.value;
+                const normalizedSearchTerm = normalizeForSearch(rawSearchTerm);
+
                 if (normalizedSearchTerm.length === 0) {
-                    suggestionsList.style.display = 'none'; return;
+                    suggestionsList.style.display = 'none';
+                    return;
                 }
-                const matches = vocabulary.filter(word => normalizeForSearch(word.latin).startsWith(normalizedSearchTerm)).slice(0, 10);
+
+                const primaryMatches = [];
+                const secondaryMatches = [];
+
+                vocabulary.forEach(word => {
+                    const normalizedLatin = normalizeForSearch(word.latin);
+                    if (normalizedLatin.startsWith(normalizedSearchTerm)) {
+                        primaryMatches.push(word);
+                    } else if (normalizedLatin.includes(' ' + normalizedSearchTerm)) {
+                        secondaryMatches.push(word);
+                    }
+                });
+
+                const matches = [...primaryMatches, ...secondaryMatches].slice(0, 10);
+
                 suggestionsList.innerHTML = '';
                 if (matches.length > 0) {
                     matches.forEach(match => {
                         const div = document.createElement('div');
-                        div.textContent = match.latin;
+                        const words = match.latin.split(' ');
+                        let hasBolded = false;
+                        const highlightedHtml = words.map(wordPart => {
+                            if (!hasBolded && normalizeForSearch(wordPart).startsWith(normalizedSearchTerm)) {
+                                hasBolded = true;
+                                const len = rawSearchTerm.length;
+                                // Use original word part to preserve casing
+                                return `<strong>${wordPart.substring(0, len)}</strong>${wordPart.substring(len)}`;
+                            }
+                            return wordPart;
+                        }).join(' ');
+                        
+                        div.innerHTML = highlightedHtml;
                         div.addEventListener('mousedown', () => displayWordDetails(match));
                         suggestionsList.appendChild(div);
                     });
